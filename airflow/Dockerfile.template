@@ -1,0 +1,19 @@
+FROM apache/airflow:$AIRFLOW_VERSION-python3.12
+
+# Set the working directory
+WORKDIR /app
+
+USER root
+
+# Fix the airflow user UID
+ENV AIRFLOW_UID=$AIRFLOW_UID
+RUN usermod -u $AIRFLOW_UID airflow
+
+# Create the /app directory
+RUN mkdir /app
+
+# Copy the requirements file into the container
+COPY requirements.txt /app
+
+# Install the Python dependencies
+RUN pip install --no-cache-dir -r requirements.lock
