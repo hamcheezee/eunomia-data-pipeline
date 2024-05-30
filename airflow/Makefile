@@ -28,7 +28,11 @@ build-airflow-image: init-airflow-dockerfile
 init-airflow: decorate-docker-compose
 		export AIRFLOW_IMAGE_NAME=$(AIRFLOW_IMAGE_NAME) AIRFLOW_UID=$(AIRFLOW_UID) && docker-compose up --force-recreate airflow-init
 
-init: decorate-docker-compose download-cli init-folders build-airflow-image init-airflow
+init-db:
+		# Migrate Airflow's metadata database
+		airflow db init
+
+init: decorate-docker-compose download-cli init-folders build-airflow-image init-airflow init-db
 
 run: build-airflow-image
 		export AIRFLOW_IMAGE_NAME=$(AIRFLOW_IMAGE_NAME) AIRFLOW_UID=$(AIRFLOW_UID) && docker-compose up --force-recreate -d
