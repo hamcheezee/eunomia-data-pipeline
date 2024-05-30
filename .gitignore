@@ -11,8 +11,8 @@ wheels/
 .env
 
 # airflow
-Dockerfile
-docker-compose.yaml
-airflow.sh
-dags/__pycache__
-logs
+airflow/Dockerfile
+airflow/docker-compose.yaml
+airflow/airflow.sh
+airflow/dags/__pycache__
+airflow/logs
