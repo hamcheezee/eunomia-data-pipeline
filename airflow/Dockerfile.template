@@ -9,11 +9,10 @@ USER root
 ENV AIRFLOW_UID=$AIRFLOW_UID
 RUN usermod -u $AIRFLOW_UID airflow
 
-# Create the /app directory
-RUN mkdir /app
-
 # Copy the requirements file into the container
-COPY requirements.txt /app
+COPY requirements.txt .
+
+USER airflow
 
 # Install the Python dependencies
-RUN pip install --no-cache-dir -r requirements.lock
+RUN pip install --no-cache-dir -r requirements.txt
