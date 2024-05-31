@@ -48,6 +48,13 @@ Before setting up the data pipeline with Airflow, ensure you have the following 
        ```
        make init
        ```
+       > Make sure that the `SA_PASSWORD` environment variable in the **mssql** service in the `docker-compose.yaml` file is replaced with your password:
+         > ```yaml
+         > services:
+         >  mssql:
+         >    environment:
+         >      - SA_PASSWORD=<SA_PASSWORD>
+         > ```
 
 4. Start Airflow services
    
