@@ -39,12 +39,18 @@ Before setting up the data pipeline with Airflow, ensure you have the following 
   
 3. Set up the Airflow environment
    
-     Inside ```airflow/```, instead of manually installing dependencies, run the following make command to automate the process:
-    ```
-    make init
-    ```
+   - Export the `SA_PASSWORD` environment variable with your MSSQL password:
+       ```
+       export SA_PASSWORD=<SA_PASSWORD>
+       ```
+
+    - Inside ```airflow/```, instead of manually installing dependencies, run the following make command to automate the process:
+       ```
+       make init
+       ```
 
 4. Start Airflow services
+   
     ```
     make run
     ```
