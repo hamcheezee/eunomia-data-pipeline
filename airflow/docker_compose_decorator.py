@@ -19,7 +19,10 @@ if "x-airflow-common" in docker_compose:
 for service in ["airflow-cli", "airflow-init", "airflow-scheduler", "airflow-worker"]:
     if "services" in docker_compose and service in docker_compose["services"]:
         docker_compose["services"][service].setdefault("environment", {})
+        # Disable loading Airflow example DAGs
         docker_compose["services"][service]["environment"]["AIRFLOW__CORE__LOAD_EXAMPLES"] = "false"
+        # Allow test connection
+        docker_compose["services"][service]["environment"]["AIRFLOW__CORE__TEST_CONNECTION"] = "Enabled"
 
 # Set Postgres port mapping
 if "services" in docker_compose and "postgres" in docker_compose["services"]:
