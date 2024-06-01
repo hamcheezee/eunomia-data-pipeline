@@ -37,6 +37,7 @@ docker_compose["services"]["mssql"] = {
         "ACCEPT_EULA": "Y"
     },
     "ports": ["1433:1433",],
+    "volumes": ["${AIRFLOW_PROJ_DIR:-.}/dags/data:/opt/airflow/dags/data",],
 }
 
 # Save the updated Docker Compose file
