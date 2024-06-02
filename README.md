@@ -62,3 +62,14 @@ Before setting up the data pipeline with Airflow, ensure you have the following 
     make run
     ```
     > Open a web browser and go to http://localhost:8080/ to access the Airflow web interface. Use the username ```airflow``` and password ```airflow``` to log in.
+
+   #### Create connection ID
+   Follow [this guide](https://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html#creating-a-connection-with-the-ui) to create a connection ID in Airflow for storing connections in the database.
+
+   > <img width="1408" alt="Screenshot 2567-06-03 at 00 09 09" src="https://github.com/hamcheezee/eunomia-data-pipeline/assets/135502061/3943036d-ab57-468b-8d39-cc9247e1ce62">
+   > If you encounter an error while testing the connection, consider using the IP address instead of the host name. You can obtain the IP address associated with the MSSQL container by executing the following command:
+   >
+   > ```
+   > docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <CONTAINER_NAME>
+   > ```
+
