@@ -9,15 +9,13 @@ USER root
 ENV AIRFLOW_UID=$AIRFLOW_UID
 RUN usermod -u $AIRFLOW_UID airflow
 
-# Install ODBC drivers and DuckDB dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# Update package lists
+RUN apt-get update
+
+# Install ODBC drivers
+RUN apt-get install -y --no-install-recommends \
     unixodbc \
     unixodbc-dev \
-    build-essential \
-    cmake \
-    git \
-    libboost-all-dev \
     && rm -rf /var/lib/apt/lists/*
 
 USER airflow
