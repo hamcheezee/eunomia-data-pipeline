@@ -28,13 +28,15 @@ for service in ["airflow-cli", "airflow-init", "airflow-scheduler", "airflow-wor
 if "services" in docker_compose and "postgres" in docker_compose["services"]:
     docker_compose["services"]["postgres"]["ports"] = ["5432:5432"]
 
-# Add mssql service configuration
+# Add MSSQL service configuration
 docker_compose["services"]["mssql"] = {
-    "image": "mcr.microsoft.com/mssql/server:2019-latest",
+    "image": "mcr.microsoft.com/azure-sql-edge",
     "container_name": "mssql",
     "environment": {
-        "SA_PASSWORD": os.environ.get("SA_PASSWORD"),
-        "ACCEPT_EULA": "Y"
+        "ACCEPT_EULA": "1",
+        "MSSQL_SA_PASSWORD": os.environ.get("MSSQL_SA_PASSWORD"),
+        "MSSQL_PID": "Developer",
+        "MSSQL_USER": "SA"
     },
     "ports": ["1433:1433",],
     "volumes": ["${AIRFLOW_PROJ_DIR:-.}/dags/data:/opt/airflow/dags/data",],
