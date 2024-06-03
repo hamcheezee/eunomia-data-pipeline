@@ -25,21 +25,25 @@ build-airflow-image: init-airflow-dockerfile
 	# Build the Airflow image
 	docker build -t $(AIRFLOW_IMAGE_NAME) -f ./Dockerfile .
 
-get-mssql-ip:
+get-mssql-ip: 
 	# Bring up the MSSQL container
 	docker-compose up -d mssql
-	
+
 	# Get the IP address of the MSSQL container
 	docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' mssql > mssql_ip.txt
 	@cat mssql_ip.txt
 
+	# Update the configuration
+	make decorate-docker-compose
+
 init-airflow: decorate-docker-compose
 	export AIRFLOW_IMAGE_NAME=$(AIRFLOW_IMAGE_NAME) AIRFLOW_UID=$(AIRFLOW_UID) && docker-compose up --force-recreate airflow-init
 
-init: get-mssql-ip decorate-docker-compose download-cli init-folders build-airflow-image init-airflow
+init: decorate-docker-compose download-cli init-folders build-airflow-image init-airflow
 
-run: build-airflow-image
-	export AIRFLOW_IMAGE_NAME=$(AIRFLOW_IMAGE_NAME) AIRFLOW_UID=$(AIRFLOW_UID) && docker-compose up --force-recreate -d
+run: build-airflow-image get-mssql-ip
+	export AIRFLOW_IMAGE_NAME=$(AIRFLOW_IMAGE_NAME) AIRFLOW_UID=$(AIRFLOW_UID) && \
+	docker-compose up -d
 
 stop:
 	docker-compose down
