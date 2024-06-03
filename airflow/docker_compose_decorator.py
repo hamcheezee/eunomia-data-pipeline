@@ -23,6 +23,8 @@ for service in ["airflow-cli", "airflow-init", "airflow-scheduler", "airflow-wor
         docker_compose["services"][service]["environment"]["AIRFLOW__CORE__LOAD_EXAMPLES"] = "false"
         # Allow test connection
         docker_compose["services"][service]["environment"]["AIRFLOW__CORE__TEST_CONNECTION"] = "Enabled"
+        # Set the default MSSQL connection
+        docker_compose["services"][service]["environment"]["AIRFLOW_CONN_MSSQL_DEFAULT"] = os.environ.get("AIRFLOW_CONN_MSSQL_DEFAULT")
 
 # Set Postgres port mapping
 if "services" in docker_compose and "postgres" in docker_compose["services"]:
