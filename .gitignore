@@ -17,3 +17,4 @@ airflow/docker-compose.yaml
 airflow/airflow.sh
 airflow/dags/__pycache__
 airflow/logs
+airflow/mssql_ip.txt
