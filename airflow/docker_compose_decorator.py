@@ -7,6 +7,21 @@ DOCKER_COMPOSE_YAML = "docker-compose.yaml"
 yaml = YAML(typ="safe")
 yaml.default_flow_style = False
 
+# Get MSSQL connection details from environment variables
+mssql_user = os.environ.get("MSSQL_USER")
+mssql_password = os.environ.get("MSSQL_SA_PASSWORD")
+mssql_database = os.environ.get("MSSQL_DATABASE")
+mssql_port = os.environ.get("MSSQL_PORT")
+
+# Check if the mssql_ip.txt file exists
+if os.path.exists("mssql_ip.txt"):
+    # Read the MSSQL IP address from the file
+    with open("mssql_ip.txt", "r") as f:
+        mssql_ip = f.read().strip()
+else:
+    # Set mssql_ip to localhost if the file doesn't exist
+    mssql_ip = "localhost"
+
 # Load the Docker Compose file
 with open(DOCKER_COMPOSE_YAML, "r", encoding="utf-8") as fd:
     docker_compose = yaml.load(fd)
@@ -24,7 +39,7 @@ for service in ["airflow-cli", "airflow-init", "airflow-scheduler", "airflow-wor
         # Allow test connection
         docker_compose["services"][service]["environment"]["AIRFLOW__CORE__TEST_CONNECTION"] = "Enabled"
         # Set the default MSSQL connection
-        docker_compose["services"][service]["environment"]["AIRFLOW_CONN_MSSQL_DEFAULT"] = os.environ.get("AIRFLOW_CONN_MSSQL_DEFAULT")
+        docker_compose["services"][service]["environment"]["AIRFLOW_CONN_MSSQL_DEFAULT"] = f"mssql://{mssql_user}:{mssql_password}@{mssql_ip}:{mssql_port}/{mssql_database}".replace("localhost", mssql_ip)
 
 # Set Postgres port mapping
 if "services" in docker_compose and "postgres" in docker_compose["services"]:
