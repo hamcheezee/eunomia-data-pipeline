@@ -14,7 +14,7 @@ Before setting up the data pipeline with Airflow, ensure you have the following 
 
 ### Installation
 
-1. Create and activate a Python virtual environment
+1. Create and activate a Python virtual environment:
    
    ```
    python3 -m venv .env
@@ -76,3 +76,37 @@ Before setting up the data pipeline with Airflow, ensure you have the following 
    > docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' <CONTAINER_NAME>
    > ```
 
+## Creating a Persistent DuckDB Database (.db/.duckdb file)
+
+### Prerequisites
+
+- DuckDB installed on your system. You can download and install it from the official website: [https://duckdb.org/docs/installation/](https://duckdb.org/docs/installation/)
+
+### Steps
+
+1. Run DuckDB in the Terminal:
+   ```
+   duckdb
+   ```
+   - This command launches the DuckDB interpreter, which you can use to interact with databases.
+  
+2. Create the Persistent Database
+   - Execute the commands sequentially within the DuckDB interpreter. Start with the ```.open "<FILE_NAME>.db"``` command to opens a connection to the database file. For example:
+     ```sql
+      .open "<FILE_NAME>.db"
+      CREATE SCHEMA eunomia;
+      -- (Optional) other SQL queries...
+      ```
+
+#### Subsequent Launches:
+To access the previously created database in future sessions, simply run the following command:
+```
+duckdb <FILE_NAME>.db
+```
+
+#### Verification:
+To verify the creation of the schema, you can use DuckDB's built-in commands:
+```sql
+SHOW DATABASES;                                           -- Lists all databases
+SELECT schema_name FROM information_schema.schemata;      -- Lists all schemas within the current database
+```
