@@ -18,3 +18,6 @@ airflow/airflow.sh
 airflow/dags/__pycache__
 airflow/logs
 airflow/mssql_ip.txt
+
+# duckdb
+airflow/duckdb/
