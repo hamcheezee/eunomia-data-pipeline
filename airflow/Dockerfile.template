@@ -25,7 +25,7 @@ COPY requirements.txt .
 COPY duckdb/duckdb.db .
 
 # Set permissions of duckdb.db file
-RUN chmod 777 /app/duckdb.db
+RUN chmod 664 /app/duckdb.db
 
 USER airflow
 
