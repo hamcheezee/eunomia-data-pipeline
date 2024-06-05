@@ -18,16 +18,21 @@ RUN apt-get install -y --no-install-recommends \
     unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the requirements file into the container
-COPY requirements.txt .
-
 # Copy duckdb.db file into the container
 COPY duckdb/duckdb.db .
 
-# Set permissions of duckdb.db file
-RUN chmod 664 /app/duckdb.db
+# Set permissions of duckdb.db file and the directory
+RUN chown -R airflow /app && \
+    chmod -R 775 /app
 
 USER airflow
 
+# Copy the requirements file into the container
+COPY requirements.txt .
+
 # Install the Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install duckdb --upgrade
+
+# Launching DuckDB
+CMD ["duckdb", "/app/duckdb.db"]
