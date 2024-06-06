@@ -59,13 +59,6 @@ docker_compose["services"]["mssql"] = {
     "volumes": ["${AIRFLOW_PROJ_DIR:-.}/dags/data:/opt/airflow/dags/data",],
 }
 
-# Add DuckDB service configuration
-docker_compose["services"]["duckdb"] = {
-    "image": "duckdb",
-    "container_name": "duckdb",
-    "ports": ["5001:5000",],
-}
-
 # Save the updated Docker Compose file
 with open(DOCKER_COMPOSE_YAML, "w", encoding="utf-8") as fd:
     yaml.dump(docker_compose, fd)
