@@ -1,18 +1,22 @@
-# python generated files
+# Python generated files
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
+
+# VS Code
 .vscode
+
+# macOS
 .DS_Store
 
-# venv
+# Virtual environments
 .venv
 .env
 
-# airflow
+# Airflow related files
 airflow/Dockerfile
 airflow/docker-compose.yaml
 airflow/airflow.sh
@@ -20,5 +24,5 @@ airflow/dags/__pycache__
 airflow/logs
 airflow/mssql_ip.txt
 
-# duckdb
+# DuckDB
 airflow/duckdb/
