@@ -97,6 +97,7 @@ Before setting up the data pipeline with Airflow, ensure you have the following 
       CREATE SCHEMA eunomia;
       -- (Optional) other SQL queries...
       ```
+   - After executing the commands, you should see the ```.db``` file created in your directory.
 
 #### Subsequent Launches:
 To access the previously created database in future sessions, simply run the following command:
@@ -105,8 +106,10 @@ duckdb <FILE_NAME>.db
 ```
 
 #### Verification:
-To verify the creation of the schema, you can use DuckDB's built-in commands:
+To verify any changes in DuckDB, you can use DuckDB's built-in commands:
 ```sql
 SHOW DATABASES;                                           -- Lists all databases
 SELECT schema_name FROM information_schema.schemata;      -- Lists all schemas within the current database
 ```
+
+> If you do not observe any changes after running the DAG to transfer data from MSSQL to DuckDB, try reconnecting to the DuckDB server. 
