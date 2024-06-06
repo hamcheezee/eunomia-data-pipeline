@@ -6,6 +6,7 @@ dist/
 wheels/
 *.egg-info
 .vscode
+.DS_Store
 
 # venv
 .venv
