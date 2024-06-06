@@ -40,6 +40,9 @@ for service in ["airflow-cli", "airflow-init", "airflow-scheduler", "airflow-wor
         docker_compose["services"][service]["environment"]["AIRFLOW__CORE__TEST_CONNECTION"] = "Enabled"
         # Set the default MSSQL connection
         docker_compose["services"][service]["environment"]["AIRFLOW_CONN_MSSQL_DEFAULT"] = f"mssql://{mssql_user}:{mssql_password}@{mssql_ip}:{mssql_port}/{mssql_database}".replace("localhost", mssql_ip)
+        # Add the DuckDB volume mapping
+        if "${AIRFLOW_PROJ_DIR:-.}/duckdb/duckdb.db:/app/duckdb.db" not in  docker_compose["services"][service]["volumes"]:
+            docker_compose["services"][service]["volumes"].append("${AIRFLOW_PROJ_DIR:-.}/duckdb/duckdb.db:/app/duckdb.db")
 
 # Set Postgres port mapping
 if "services" in docker_compose and "postgres" in docker_compose["services"]:
@@ -58,6 +61,10 @@ docker_compose["services"]["mssql"] = {
     "ports": ["1433:1433",],
     "volumes": ["${AIRFLOW_PROJ_DIR:-.}/dags/data:/opt/airflow/dags/data",],
 }
+
+# Add duckdb-volume in volumes section
+if "duckdb-volume" not in docker_compose["volumes"]:
+    docker_compose["volumes"]["duckdb-volume"] = None
 
 # Save the updated Docker Compose file
 with open(DOCKER_COMPOSE_YAML, "w", encoding="utf-8") as fd:
