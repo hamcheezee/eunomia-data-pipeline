@@ -18,9 +18,6 @@ RUN apt-get install -y --no-install-recommends \
     unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy duckdb folder into the container
-COPY duckdb .
-
 # Set ownership to directory and user
 RUN chown -R airflow /app && \
     chmod -R 775 /app
