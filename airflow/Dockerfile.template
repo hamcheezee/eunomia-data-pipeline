@@ -32,4 +32,4 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && pip install duckdb --upgrade
 
 # Launching DuckDB
-CMD ["duckdb", "/app/duckdb.db"]
+CMD ["duckdb", "/app/duckdb/duckdb.db"]
