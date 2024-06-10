@@ -170,7 +170,8 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
 with DAG('data_transfer', 
          default_args=default_args, 
          description='A DAG to transfer data from MSSQL to DuckDB',
-         schedule_interval=None) as dag:
+         schedule_interval='@daily',
+         catchup=False) as dag:
 
     src_tables = get_src_tables()
     previous_table_task = None
