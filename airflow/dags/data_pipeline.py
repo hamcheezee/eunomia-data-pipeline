@@ -15,35 +15,6 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
-# Global connection to DuckDB
-duckdb_conn = None
-
-def connect_to_duckdb():
-    """
-    Establishes a connection to the DuckDB database.
-
-    Returns:
-        duckdb.DuckDBPyConnection: A connection object to the DuckDB database.
-
-    Raises:
-        Exception: If an error occurs during the connection attempt.
-
-    """
-
-    global duckdb_conn
-
-    # Ensure a single connection instance is reused
-    if duckdb_conn is None:
-        try:
-            # Connect to DuckDB
-            duckdb_conn = duckdb.connect("duckdb/duckdb.db")
-            logging.info("Successfully connected to DuckDB")
-        except Exception as e:
-            logging.error(f"An error occurred: {e}")
-            raise
-    
-    return duckdb_conn
-
 def get_src_tables():
     """
     Retrieves the names of source tables from a MSSQL database.
@@ -107,7 +78,13 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
     """
 
     # Establishe a connection
-    conn = connect_to_duckdb()
+    try:
+        # Connect to DuckDB
+        conn = duckdb.connect("duckdb/duckdb.db")
+        logging.info("Successfully connected to DuckDB")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        raise
 
     df = extract_data_from_src(table_name)
 
