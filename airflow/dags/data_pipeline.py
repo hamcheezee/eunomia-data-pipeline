@@ -1,7 +1,6 @@
 from airflow import DAG
 from airflow.providers.microsoft.mssql.hooks.mssql import MsSqlHook
 from airflow.operators.python import PythonOperator
-from great_expectations_provider.operators.great_expectations import GreatExpectationsOperator
 from airflow.utils.task_group import TaskGroup
 from datetime import datetime, timedelta
 import duckdb
@@ -96,42 +95,6 @@ def extract_data_from_src(table_name):
     
     return df
 
-def create_duckdb_table(catalog_name, schema_name, table_name):
-    """
-    Creates a DuckDB table if it does not already exist and populates it with data from a source DataFrame.
-
-    Args:
-        catalog_name (str): The name of the catalog.
-        schema_name (str): The name of the schema.
-        table_name (str): The name of the table to create.
-
-    """
-
-    # Establishe a connection
-    conn = connect_to_duckdb()
-
-    # Get a list of existing DuckDB tables
-    table_result = conn.execute(f"""SELECT table_name FROM information_schema.tables
-                     WHERE table_catalog='{catalog_name}' AND table_schema='{schema_name}'""").fetchall()
-    duckdb_tables =  [row[0] for row in table_result]
-
-    # Check if the DuckDB table already exists
-    if table_name not in duckdb_tables:
-        df = extract_data_from_src(table_name)
-    
-        # Create the table
-        create_table_statement = f"""CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} AS 
-                                     SELECT * FROM df;"""
-        conn.execute(create_table_statement)
-        
-        creation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        logging.info(f"Successfully created table: {table_name}. Created on: {creation_date}")
-        
-        # Commit changes
-        conn.commit()
-    else:
-        logging.info(f"Table '{table_name}' already exists in catalog '{catalog_name}' and schema '{schema_name}'")
-
 def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
     """
     Loads source data into a DuckDB table.
@@ -146,35 +109,28 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
     # Establishe a connection
     conn = connect_to_duckdb()
 
-    # Create the table if not exists
-    create_duckdb_table(catalog_name, schema_name, table_name)
+    df = extract_data_from_src(table_name)
 
-    # Count the existing records in the table
-    count_result = conn.execute(f"""SELECT count(*) FROM {catalog_name}.{schema_name}.{table_name};""").fetchall()
-    count = count_result[0][0]
-    logging.info(logging.info(f"Found {count} records from table {table_name}"))
+    # Create table if not exists
+    conn.execute(f"""CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} AS 
+                     SELECT * FROM df
+                     WHERE 0=1;""")
+    logging.info(f"Successfully created table: {table_name}.")
 
-    # If the table is empty:
-    if count == 0:
-        df = extract_data_from_src(table_name)
+    # Insert data from source into DuckDB table
+    conn.register('df', df)
+    conn.execute(f"""INSERT INTO {catalog_name}.{schema_name}.{table_name}
+                     SELECT * FROM df""")
+    logging.info(f"Data inserted successfully into {table_name}")
 
-        # Insert data from source into DuckDB table
-        conn.register('df', df)
-        conn.execute(f"""INSERT INTO {catalog_name}.{schema_name}.{table_name}
-                         SELECT * FROM df""")
-        logging.info(f"Data inserted successfully into {table_name}")
-    # If the table already has data:
-    else:
-        skip_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        logging.info(f"Skipping insert process as {table_name} already has data. Skipped on {skip_date}")
-
-    # Close the connection
+    # Commit changes and close the connection
+    conn.commit()
     conn.close()
 
 with DAG('data_transfer', 
          default_args=default_args, 
          description='A DAG to transfer data from MSSQL to DuckDB',
-         schedule_interval='@daily',
+         schedule_interval=None,
          catchup=False) as dag:
 
     src_tables = get_src_tables()
