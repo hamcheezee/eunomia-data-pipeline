@@ -22,6 +22,9 @@ dag = DAG(
     schedule_interval=None,
 )
 
+data_dir = "/opt/airflow/dags/data/"
+chunk_size = 10000
+
 def create_table():
     """
     Create SQL tables based on CSV files present in a directory.
@@ -62,23 +65,19 @@ def create_table():
     conn = hook.get_conn()
     cursor = conn.cursor()
 
-    # Directory containing CSV files
-    data_dir = "/opt/airflow/dags/data/"
-
     for file in os.listdir(data_dir):
         # Extract table name from file name
         table_name = file.split('.')[0].lower()
 
         # Read CSV into DataFrame
-        df = pd.read_csv(os.path.join(data_dir, file))
+        df_chunk = pd.read_csv(os.path.join(data_dir, file), chunksize=chunk_size)
+        df = next(df_chunk)
 
         # Infer SQL data types for DataFrame columns
         column_types = {column: infer_sql_type(column, df[column].dtype) for column in df.columns}
 
         # Generate column definitions for CREATE TABLE statement
-        columns_def = ",\n    ".join([f"{column} {col_type}" for column, col_type in column_types.items()])
-
-        # Create SQL statement for table creation
+        columns_def = ",\n    ".join([f"[{column}] {col_type}" for column, col_type in column_types.items()])
         create_statement = f"""
             IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[{table_name}]') AND type in (N'U'))
             BEGIN
@@ -89,11 +88,11 @@ def create_table():
         """
 
         # Execute the CREATE TABLE query
-        logging.info(f"Successfully created table: {table_name}")
         cursor.execute(create_statement)
+        conn.commit()
+        logging.info(f"Successfully created table: {table_name}")
 
-    # Commit changes and close connection
-    conn.commit()
+    # Close connection
     conn.close()
 
 def load_csv_to_mssql():
@@ -109,38 +108,35 @@ def load_csv_to_mssql():
     conn = hook.get_conn()
     cursor = conn.cursor()
 
-    # Directory containing CSV files
-    data_dir = "/opt/airflow/dags/data/"
-
     for file in os.listdir(data_dir):
         # Extract table name from file name
         table_name = file.split('.')[0].lower()
 
+        # Count the number of lines in the file (excluding the header)
+        with open(os.path.join(data_dir, file)) as f:
+            total_rows = sum(1 for line in f) - 1
+
         # Read CSV into DataFrame
-        df = pd.read_csv(os.path.join(data_dir, file))
+        df_chunk = pd.read_csv(os.path.join(data_dir, file), chunksize=chunk_size)
+        total_rows_processed = 0
 
-        # Fill NaN values with None
-        df = df.where(pd.notnull(df), None)
+        for chunk in df_chunk:
+            chunk = chunk.where(pd.notnull(chunk), None)  # Fill NaN values with None
+            columns = chunk.columns.tolist()
+            columns_quoted = [f"[{col}]" for col in columns]  # Quote column names
+            insert_statement = f"INSERT INTO [dbo].[{table_name}] ({', '.join(columns_quoted)}) VALUES ({', '.join(['%s'] * len(columns))})"
+            
+            # Iterate over DataFrame rows and insert into the table
+            for row in chunk.itertuples(index=False, name=None):
+                row = [None if pd.isna(value) else value for value in row]  # Replace NaN values with None
+                cursor.execute(insert_statement, row)
+                total_rows_processed += 1
+            logging.info(f"Total rows processed: {total_rows_processed} out of {total_rows}")
 
-        # Get list of columns
-        columns = df.columns.tolist()
-
-        # Create SQL INSERT statement
-        insert_statement = f"""
-            INSERT INTO [dbo].[{table_name}] ({', '.join(columns)})
-            VALUES ({', '.join(['%s'] * len(columns))})
-        """
-
-        # Iterate over DataFrame rows and insert into the table
-        for row in df.itertuples(index=False, name=None):
-            # Replace 'nan' values with None
-            row = [None if pd.isna(value) else value for value in row]
-            cursor.execute(insert_statement, row)
-
-        logging.info(f"Successfully inserted data into table: {table_name}")
+        # Commit changes
+        conn.commit()
     
-    # Commit changes and close connection
-    conn.commit()
+    # Close connection
     conn.close()
 
 with DAG('load_csv_to_mssql', 
@@ -152,6 +148,7 @@ with DAG('load_csv_to_mssql',
     create_table_task = PythonOperator(
         task_id='create_table',
         python_callable=create_table,
+        execution_timeout=timedelta(hours=2),
         dag=dag,
     )
 
@@ -159,6 +156,7 @@ with DAG('load_csv_to_mssql',
     load_csv_task = PythonOperator(
         task_id='load_csv_to_mssql',
         python_callable=load_csv_to_mssql,
+        execution_timeout=timedelta(hours=10),
         dag=dag,
     )
 
