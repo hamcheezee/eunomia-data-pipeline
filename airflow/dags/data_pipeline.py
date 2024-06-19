@@ -15,7 +15,11 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
-def get_src_tables():
+catalog_name = "duckdb"
+schema_name = "eunomia"
+chunk_size = 10000
+
+def get_src_tables(schema_name):
     """
     Retrieves the names of source tables from a MSSQL database.
 
@@ -28,8 +32,7 @@ def get_src_tables():
     hook = MsSqlHook(mssql_conn_id="mssql_default")
 
     # Retrieve table names
-    select_table_statement = "SELECT name AS table_name FROM eunomia.sys.tables"
-    df = hook.get_pandas_df(select_table_statement)
+    df = hook.get_pandas_df(f"SELECT name AS table_name FROM {schema_name}.sys.tables")
     table_list = df['table_name'].tolist()
 
     return table_list
@@ -51,11 +54,9 @@ def extract_data_from_src(table_name):
     conn = hook.get_conn()
     cursor = conn.cursor()
 
-    select_statement = f"SELECT * FROM {table_name}"
-    logging.info(f"Extracting data from table: {table_name}")
-
     # Execute query and fetch data into a pandas DataFrame
-    cursor.execute(select_statement)
+    logging.info(f"Extracting data from table: {table_name}")
+    cursor.execute(f"SELECT * FROM {table_name}")
     data = cursor.fetchall()
     columns = [col[0] for col in cursor.description]
     df = pd.DataFrame(data, columns=columns)
@@ -88,7 +89,7 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
 
     df = extract_data_from_src(table_name)
 
-    # Create table if not exists
+    # Create an empty table if it does not exist
     conn.execute(f"""CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} AS 
                      SELECT * FROM df
                      WHERE 0=1;""")
@@ -110,7 +111,7 @@ with DAG('data_transfer',
          schedule_interval=None,
          catchup=False) as dag:
 
-    src_tables = get_src_tables()
+    src_tables = get_src_tables(schema_name)
     previous_table_task = None
     
     for table in src_tables:
@@ -127,7 +128,7 @@ with DAG('data_transfer',
             load_task = PythonOperator(
                 task_id=f'load_data_{table}',
                 python_callable=load_src_data_to_duckdb,
-                op_kwargs={'catalog_name': 'duckdb', 'schema_name': 'eunomia', 'table_name': table},
+                op_kwargs={'catalog_name': catalog_name, 'schema_name': schema_name, 'table_name': table},
                 dag=dag
             )
     
