@@ -14,6 +14,7 @@ apache-airflow-providers-ftp==3.9.1
 apache-airflow-providers-http==4.11.1
 apache-airflow-providers-imap==3.6.1
 apache-airflow-providers-microsoft-mssql==3.7.1
+apache-airflow-providers-odbc==4.6.1
 apache-airflow-providers-smtp==1.7.1
 apache-airflow-providers-sqlite==3.8.1
 apispec==6.6.1
@@ -41,7 +42,7 @@ colorama==0.4.6
 colorlog==4.8.0
 comm==0.2.2
 ConfigUpdater==3.2
-cKfcoiu4869onnexion==2.14.2
+connexion==2.14.2
 cron-descriptor==1.4.3
 croniter==2.0.5
 cryptography==42.0.8
