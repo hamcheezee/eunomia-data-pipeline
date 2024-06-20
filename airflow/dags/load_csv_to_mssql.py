@@ -134,6 +134,7 @@ def load_csv_to_mssql():
             logging.info(f"Total rows processed: {total_rows_processed} out of {total_rows}")
 
         # Commit changes
+        logging.info(f"Successfully inserted data into table: {table_name}")
         conn.commit()
     
     # Close connection
