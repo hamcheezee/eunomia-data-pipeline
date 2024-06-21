@@ -121,14 +121,6 @@ with DAG('data_transfer',
     
     for table in src_tables:
         with TaskGroup(f"table_{table}_group") as table_group:
-            # Task to extract data from the source
-            extract_task = PythonOperator(
-                task_id=f'extract_data_{table}',
-                python_callable=extract_data_from_src,
-                op_kwargs={'table_name': table},
-                dag=dag
-            )
-
             # Task to load data into DuckDB
             load_task = PythonOperator(
                 task_id=f'load_data_{table}',
@@ -137,7 +129,7 @@ with DAG('data_transfer',
                 dag=dag
             )
     
-            extract_task >> load_task
+            load_task
 
         if previous_table_task:
             # Current table's task group starts only after the previous table's task group has completed
