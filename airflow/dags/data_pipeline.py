@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.providers.microsoft.mssql.hooks.mssql import MsSqlHook
 from airflow.operators.python import PythonOperator
+from great_expectations_provider.operators.great_expectations import GreatExpectationsOperator
 from airflow.utils.task_group import TaskGroup
 from datetime import datetime, timedelta
 import duckdb
@@ -15,16 +16,20 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
+mssql_conn_id="mssql_default"
+conn_id="mssql_default"
+database_name = "eunomia"
+mssql_schema_name = "dbo"
 catalog_name = "duckdb"
-schema_name = "eunomia"
+duckdb_schema_name = "eunomia"
 chunk_size = 10000
 
-def get_src_tables(schema_name):
+def get_src_tables(database_name):
     """
     Retrieves the names of source tables from a MSSQL database.
 
     Args:
-        schema_name (str): The name of the schema.
+        database_name (str): The name of the database.
 
     Returns:
         list: A list containing the names of source tables.
@@ -32,10 +37,10 @@ def get_src_tables(schema_name):
     """
 
     # Initialize MSSQL connection
-    hook = MsSqlHook(mssql_conn_id="mssql_default")
+    hook = MsSqlHook(mssql_conn_id=mssql_conn_id)
 
     # Retrieve table names
-    df = hook.get_pandas_df(f"SELECT name AS table_name FROM {schema_name}.sys.tables")
+    df = hook.get_pandas_df(f"SELECT name AS table_name FROM {database_name}.sys.tables")
     table_list = df['table_name'].tolist()
 
     return table_list
@@ -54,7 +59,7 @@ def extract_data_from_src(table_name, chunk_size=chunk_size):
     """
 
     # Initialize MSSQL connection
-    hook = MsSqlHook(mssql_conn_id="mssql_default")
+    hook = MsSqlHook(mssql_conn_id=mssql_conn_id)
     conn = hook.get_conn()
 
     logging.info(f"Extracting data from table: {table_name}")
@@ -116,20 +121,32 @@ with DAG('data_transfer',
          schedule_interval=None,
          catchup=False) as dag:
 
-    src_tables = get_src_tables(schema_name)
+    src_tables = get_src_tables(database_name)
     previous_table_task = None
     
-    for table in src_tables:
-        with TaskGroup(f"table_{table}_group") as table_group:
+    for table_name in src_tables:
+        with TaskGroup(f"table_{table_name}_group") as table_group:
+            # Task to validate the data using Great Expectations
+            validate_data_task = GreatExpectationsOperator(
+                task_id=f'gx_validate_{table_name}',
+                conn_id=conn_id,
+                data_context_root_dir='/app/great_expectations',
+                schema=mssql_schema_name,
+                data_asset_name=table_name,
+                expectation_suite_name=f'{table_name}_suite',
+                return_json_dict=True,
+                dag=dag,
+            )
+
             # Task to load data into DuckDB
             load_task = PythonOperator(
-                task_id=f'load_data_{table}',
+                task_id=f'load_data_{table_name}',
                 python_callable=load_src_data_to_duckdb,
-                op_kwargs={'catalog_name': catalog_name, 'schema_name': schema_name, 'table_name': table},
+                op_kwargs={'catalog_name': catalog_name, 'schema_name': duckdb_schema_name, 'table_name': table_name},
                 dag=dag
             )
     
-            load_task
+            validate_data_task >> load_task
 
         if previous_table_task:
             # Current table's task group starts only after the previous table's task group has completed
