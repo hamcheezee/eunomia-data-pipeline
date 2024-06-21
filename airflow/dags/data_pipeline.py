@@ -23,6 +23,9 @@ def get_src_tables(schema_name):
     """
     Retrieves the names of source tables from a MSSQL database.
 
+    Args:
+        schema_name (str): The name of the schema.
+
     Returns:
         list: A list containing the names of source tables.
 
@@ -37,35 +40,38 @@ def get_src_tables(schema_name):
 
     return table_list
 
-def extract_data_from_src(table_name):
+def extract_data_from_src(table_name, chunk_size=chunk_size):
     """
     Extracts data from a specified table in a MSSQL database.
 
     Args:
         table_name (str): The name of the table to extract data from.
+        chunk_size (int): The number of rows to include in each chunk.
 
-    Returns:
-        pandas.DataFrame: DataFrame containing the extracted data.
+    Yields:
+        pandas.DataFrame: DataFrame containing a chunk of rows from the specified table.
         
     """
 
     # Initialize MSSQL connection
     hook = MsSqlHook(mssql_conn_id="mssql_default")
     conn = hook.get_conn()
-    cursor = conn.cursor()
+
+    logging.info(f"Extracting data from table: {table_name}")
+    total_rows = pd.read_sql(f"SELECT COUNT(*) FROM {table_name}", conn).iloc[0, 0]
+    logging.info(f"Total rows to be processed from {table_name}: {total_rows}")
 
     # Execute query and fetch data into a pandas DataFrame
-    logging.info(f"Extracting data from table: {table_name}")
-    cursor.execute(f"SELECT * FROM {table_name}")
-    data = cursor.fetchall()
-    columns = [col[0] for col in cursor.description]
-    df = pd.DataFrame(data, columns=columns)
+    query = f"SELECT * FROM {table_name}"
+    chunk_count = 0
+    for chunk in pd.read_sql(query, conn, chunksize=chunk_size):
+        chunk_count += 1
+        logging.info(f"Processing chunk {chunk_count} with {len(chunk)} rows from {table_name}")
+        yield chunk  # Yield the chunk as a DataFrame
+    logging.info(f"Finished processing all chunks from {table_name}")
 
-    # Close cursor and connection
-    cursor.close()
+    # Close the connection
     conn.close()
-    
-    return df
 
 def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
     """
@@ -78,7 +84,7 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
         
     """
 
-    # Establishe a connection
+    # Establish a connection
     try:
         # Connect to DuckDB
         conn = duckdb.connect("duckdb/duckdb.db")
@@ -87,18 +93,17 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
         logging.error(f"An error occurred: {e}")
         raise
 
-    df = extract_data_from_src(table_name)
-
-    # Create an empty table if it does not exist
-    conn.execute(f"""CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} AS 
-                     SELECT * FROM df
+    total_rows_inserted = 0
+    for chunk in extract_data_from_src(table_name):
+        # Create an empty table if it does not exist
+        conn.execute(f"""CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} AS 
+                     SELECT * FROM chunk
                      WHERE 0=1;""")
-    logging.info(f"Successfully created table: {table_name}.")
 
-    # Insert data from source into DuckDB table
-    conn.register('df', df)
-    conn.execute(f"""INSERT INTO {catalog_name}.{schema_name}.{table_name}
-                     SELECT * FROM df""")
+        # Insert data from source into DuckDB table
+        conn.register('chunk', chunk)
+        conn.execute(f"""INSERT INTO {catalog_name}.{schema_name}.{table_name}
+                     SELECT * FROM chunk""")
     logging.info(f"Data inserted successfully into {table_name}")
 
     # Commit changes and close the connection
