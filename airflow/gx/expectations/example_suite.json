@@ -1,0 +1,16 @@
+{
+    "data_asset_type": null,
+    "expectation_suite_name": "example_suite",
+    "expectations": [
+        {
+            "expectation_type": "expect_column_values_to_not_be_null",
+            "kwargs": {
+                "column": "person_id"
+            }
+        }
+    ],
+    "ge_cloud_id": null,
+    "meta": {
+        "great_expectations_version": "0.18.15"
+    }
+}
