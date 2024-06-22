@@ -58,7 +58,7 @@ docker_compose["services"]["mssql"] = {
         "MSSQL_PID": "Developer",
         "MSSQL_USER": "SA"
     },
-    "ports": ["1433:1433",],
+    "ports": ["1434:1433",],
     "volumes": ["${AIRFLOW_PROJ_DIR:-.}/dags/data:/opt/airflow/dags/data",],
 }
 
