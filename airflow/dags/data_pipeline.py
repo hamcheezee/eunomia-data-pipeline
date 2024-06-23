@@ -18,9 +18,9 @@ default_args = {
 
 mssql_conn_id="mssql_default"
 conn_id="mssql_default"
-database_name = "eunomia"
+mssql_database_name = "eunomia"
 mssql_schema_name = "dbo"
-catalog_name = "duckdb"
+duckdb_catalog_name = "duckdb"
 duckdb_schema_name = "eunomia"
 chunk_size = 10000
 
@@ -45,6 +45,29 @@ def get_src_tables(database_name):
 
     return table_list
 
+def get_src_table_types(table_name):
+    """
+    Retrieves column names and their corresponding data types from a specified table in MSSQL database.
+
+    Args:
+        table_name (str): The name of the table.
+
+    Returns:
+        dict: A dictionary mapping column names to their respective data types.
+              Example: {'column1': 'varchar', 'column2': 'int', ...}
+    """
+    
+    # Initialize MSSQL connection
+    hook = MsSqlHook(mssql_conn_id=mssql_conn_id)
+
+    # Retrieve column names and their types
+    df = hook.get_pandas_df(f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table_name}'")
+    column_types = {}
+    column_types = df.set_index('column_name').to_dict()['data_type']
+    column_types = {col: ('timestamp' if dtype == 'datetime2' else dtype) for col, dtype in column_types.items()}  # Replacing 'datetime2' with 'timestamp'
+
+    return column_types
+
 def extract_data_from_src(table_name, chunk_size=chunk_size):
     """
     Extracts data from a specified table in a MSSQL database.
@@ -64,14 +87,13 @@ def extract_data_from_src(table_name, chunk_size=chunk_size):
 
     logging.info(f"Extracting data from table: {table_name}")
     total_rows = pd.read_sql(f"SELECT COUNT(*) FROM {table_name}", conn).iloc[0, 0]
-    logging.info(f"Total rows to be processed from {table_name}: {total_rows}")
+    total_rows_processed = 0
 
     # Execute query and fetch data into a pandas DataFrame
     query = f"SELECT * FROM {table_name}"
-    chunk_count = 0
     for chunk in pd.read_sql(query, conn, chunksize=chunk_size):
-        chunk_count += 1
-        logging.info(f"Processing chunk {chunk_count} with {len(chunk)} rows from {table_name}")
+        total_rows_processed += len(chunk)
+        logging.info(f"Processing {total_rows_processed} out of {total_rows} rows from {table_name}")
         yield chunk  # Yield the chunk as a DataFrame
     logging.info(f"Finished processing all chunks from {table_name}")
 
@@ -98,12 +120,16 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
         logging.error(f"An error occurred: {e}")
         raise
 
-    total_rows_inserted = 0
+    column_types = get_src_table_types(table_name)
+    first_chunk = True
     for chunk in extract_data_from_src(table_name):
-        # Create an empty table if it does not exist
-        conn.execute(f"""CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} AS 
-                     SELECT * FROM chunk
-                     WHERE 0=1;""")
+        if first_chunk:
+            # Create an empty table if it does not exist
+            query = f"CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} (" + \
+                     ", ".join([f"{col} {column_types[col]}" for col in chunk.columns]) + \
+                     ")"
+            conn.execute(query)
+            first_chunk = False
 
         # Insert data from source into DuckDB table
         conn.register('chunk', chunk)
@@ -111,8 +137,7 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
                      SELECT * FROM chunk""")
     logging.info(f"Data inserted successfully into {table_name}")
 
-    # Commit changes and close the connection
-    conn.commit()
+    # Close the connection
     conn.close()
 
 with DAG('data_transfer', 
@@ -121,7 +146,7 @@ with DAG('data_transfer',
          schedule_interval=None,
          catchup=False) as dag:
 
-    src_tables = get_src_tables(database_name)
+    src_tables = get_src_tables(mssql_database_name)
     previous_table_task = None
     
     for table_name in src_tables:
@@ -142,7 +167,7 @@ with DAG('data_transfer',
             load_task = PythonOperator(
                 task_id=f'load_data_{table_name}',
                 python_callable=load_src_data_to_duckdb,
-                op_kwargs={'catalog_name': catalog_name, 'schema_name': duckdb_schema_name, 'table_name': table_name},
+                op_kwargs={'catalog_name': duckdb_catalog_name, 'schema_name': duckdb_schema_name, 'table_name': table_name},
                 dag=dag
             )
     
