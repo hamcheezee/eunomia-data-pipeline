@@ -100,6 +100,36 @@ def extract_data_from_src(table_name, chunk_size=chunk_size):
     # Close the connection
     conn.close()
 
+def extract_data_from_src_to_df(table_name, chunk_size=chunk_size):
+    """
+    Extracts data from a specified MSSQL table and returns it as a Pandas DataFrame.
+
+    Args:
+        table_name (str): The name of the table to extract data from.
+        chunk_size (int): The number of rows to process in each chunk.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing all the data from the specified table.
+
+    """
+    
+     # Initialize MSSQL connection
+    hook = MsSqlHook(mssql_conn_id=mssql_conn_id)
+    conn = hook.get_conn()
+
+    # Retrieve data in chunks
+    data_chunks = []
+    query = f"SELECT * FROM {table_name}"
+    for chunk in pd.read_sql(query, conn, chunksize=chunk_size):
+        data_chunks.append(chunk)
+
+    # Concatenate all chunks into a single DataFrame
+    data = pd.concat(data_chunks, ignore_index=True)
+    logging.info(f"Finished processing all chunks from {table_name}")
+    conn.close()
+
+    return data
+
 def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
     """
     Loads source data into a DuckDB table.
@@ -140,7 +170,7 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
     # Close the connection
     conn.close()
 
-with DAG('data_transfer', 
+with DAG('data_pipeline', 
          default_args=default_args, 
          description='A DAG to transfer data from MSSQL to DuckDB',
          schedule_interval=None,
