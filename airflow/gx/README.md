@@ -62,11 +62,31 @@ validate_data_task = GreatExpectationsOperator(
 )
 ```
 
+The GreatExpectationsOperator can also be used to run validations on a Pandas DataFrame by specifying parameters like this:
+
+```python
+# Extract data from database into a DataFrame
+data_to_validate = extract_data_from_src_to_df(table_name)
+
+validate_data_task = GreatExpectationsOperator(
+    task_id=f'gx_validate_TABLE_NAME',
+    data_context_root_dir=DATA_CONTEXT_ROOT_DIR,
+    data_asset_name=TABLE_NAME,
+    dataframe_to_validate=data_to_validate,
+    execution_engine='PandasExecutionEngine',
+    expectation_suite_name='example_suite',
+    return_json_dict=True,
+    dag=dag,
+)
+```
+
 ### Operator parameters:
 
 - **data_context_root_dir:** Path of the great_expectations directory
 - **schema:** The schema within your database where the data asset is located.  Note that instead of using the schema parameter, you can also provide the schema name to the ```data_asset_name``` parameter in the form of ```SCHEMA_NAME.TABLE_NAME```
 - **data_asset_name:** The name of the table or dataframe that the default Data Context will load and default Checkpoint will run over
+- **dataframe_to_validate:** A pandas dataframe to validate
+- **execution_engine:** The execution engine to use when running Great Expectations
 - **expectation_suite_name:** Name of the expectation suite to run if using a default Checkpoint
 - **return_json_dict:** If True, returns a json-serializable dictionary instead of a CheckpointResult object
 
