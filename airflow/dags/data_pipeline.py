@@ -180,14 +180,28 @@ with DAG('data_pipeline',
     previous_table_task = None
     
     for table_name in src_tables:
+        data_to_validate = extract_data_from_src_to_df(table_name)
+
         with TaskGroup(f"table_{table_name}_group") as table_group:
-            # Task to validate the data using Great Expectations
+            # Task to validate the data from MSSQL
+            # validate_data_task = GreatExpectationsOperator(
+            #     task_id=f'gx_validate_{table_name}',
+            #     conn_id=conn_id,
+            #     data_context_root_dir='/app/great_expectations',
+            #     schema=mssql_schema_name,
+            #     data_asset_name=table_name,
+            #     expectation_suite_name=f'{table_name}_suite',
+            #     return_json_dict=True,
+            #     dag=dag,
+            # )
+
+            # Task to validate the data from Pandas DataFrame
             validate_data_task = GreatExpectationsOperator(
                 task_id=f'gx_validate_{table_name}',
-                conn_id=conn_id,
                 data_context_root_dir='/app/great_expectations',
-                schema=mssql_schema_name,
-                data_asset_name=table_name,
+                data_asset_name=f'{table_name}',
+                dataframe_to_validate=data_to_validate,
+                execution_engine='PandasExecutionEngine',
                 expectation_suite_name=f'{table_name}_suite',
                 return_json_dict=True,
                 dag=dag,
