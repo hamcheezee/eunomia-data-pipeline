@@ -54,9 +54,9 @@ docker_compose["services"]["mssql"] = {
     "container_name": "mssql",
     "environment": {
         "ACCEPT_EULA": "1",
-        "MSSQL_SA_PASSWORD": os.environ.get("MSSQL_SA_PASSWORD"),
+        "MSSQL_SA_PASSWORD": mssql_password,
         "MSSQL_PID": "Developer",
-        "MSSQL_USER": "SA"
+        "MSSQL_USER": mssql_user
     },
     "ports": ["1434:1433",],
     "volumes": ["${AIRFLOW_PROJ_DIR:-.}/dags/data:/opt/airflow/dags/data",],
