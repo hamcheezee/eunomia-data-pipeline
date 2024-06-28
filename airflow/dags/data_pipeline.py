@@ -45,11 +45,13 @@ def get_src_tables(database_name):
 
     return table_list
 
-def get_src_table_types(table_name):
+def get_src_table_types(table_name, database_name=mssql_database_name, schema_name=mssql_schema_name):
     """
     Retrieves column names and their corresponding data types from a specified table in MSSQL database.
 
     Args:
+        database_name (str): The name of the database.
+        schema_name (str): The name of the schema.
         table_name (str): The name of the table.
 
     Returns:
@@ -61,18 +63,29 @@ def get_src_table_types(table_name):
     hook = MsSqlHook(mssql_conn_id=mssql_conn_id)
 
     # Retrieve column names and their types
-    df = hook.get_pandas_df(f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table_name}'")
+    df = hook.get_pandas_df(f"""SELECT column_name, data_type 
+                                FROM [{database_name}].information_schema.columns 
+                                WHERE table_schema = '{schema_name}' AND table_name = '{table_name}'
+                             """)
     column_types = {}
     column_types = df.set_index('column_name').to_dict()['data_type']
-    column_types = {col: ('timestamp' if dtype == 'datetime2' else dtype) for col, dtype in column_types.items()}  # Replacing 'datetime2' with 'timestamp'
+    column_types = {
+        col: ('timestamp' if dtype == 'datetime2' 
+              else 'varchar' if dtype == 'nvarchar'  # 'varchar' for Unicode characters encoded as UTF-8
+              else 'int' if dtype == 'smallint' 
+              else dtype) 
+        for col, dtype in column_types.items()
+    }
 
     return column_types
 
-def extract_data_from_src(table_name, chunk_size=chunk_size):
+def extract_data_from_src(table_name, database_name=mssql_database_name, schema_name=mssql_schema_name, chunk_size=chunk_size):
     """
     Extracts data from a specified table in a MSSQL database.
 
     Args:
+        database_name (str): The name of the database.
+        schema_name (str): The name of the schema.
         table_name (str): The name of the table to extract data from.
         chunk_size (int): The number of rows to include in each chunk.
 
@@ -86,11 +99,11 @@ def extract_data_from_src(table_name, chunk_size=chunk_size):
     conn = hook.get_conn()
 
     logging.info(f"Extracting data from table: {table_name}")
-    total_rows = pd.read_sql(f"SELECT COUNT(*) FROM {table_name}", conn).iloc[0, 0]
+    total_rows = pd.read_sql(f"SELECT COUNT(*) FROM [{database_name}].[{schema_name}].[{table_name}]", conn).iloc[0, 0]
     total_rows_processed = 0
 
     # Execute query and fetch data into a pandas DataFrame
-    query = f"SELECT * FROM {table_name}"
+    query = f"SELECT * FROM [{database_name}].[{schema_name}].[{table_name}]"
     for chunk in pd.read_sql(query, conn, chunksize=chunk_size):
         total_rows_processed += len(chunk)
         logging.info(f"Processing {total_rows_processed} out of {total_rows} rows from {table_name}")
@@ -156,7 +169,7 @@ def load_src_data_to_duckdb(catalog_name, schema_name, table_name):
         if first_chunk:
             # Create an empty table if it does not exist
             query = f"CREATE TABLE IF NOT EXISTS {catalog_name}.{schema_name}.{table_name} (" + \
-                     ", ".join([f"{col} {column_types[col]}" for col in chunk.columns]) + \
+                     ", ".join([f'"{col}" {column_types[col]}' for col in chunk.columns]) + \
                      ")"
             conn.execute(query)
             first_chunk = False
@@ -180,32 +193,30 @@ with DAG('data_pipeline',
     previous_table_task = None
     
     for table_name in src_tables:
-        data_to_validate = extract_data_from_src_to_df(table_name)
-
         with TaskGroup(f"table_{table_name}_group") as table_group:
             # Task to validate the data from MSSQL
-            # validate_data_task = GreatExpectationsOperator(
-            #     task_id=f'gx_validate_{table_name}',
-            #     conn_id=conn_id,
-            #     data_context_root_dir='/app/great_expectations',
-            #     schema=mssql_schema_name,
-            #     data_asset_name=table_name,
-            #     expectation_suite_name=f'{table_name}_suite',
-            #     return_json_dict=True,
-            #     dag=dag,
-            # )
-
-            # Task to validate the data from Pandas DataFrame
             validate_data_task = GreatExpectationsOperator(
                 task_id=f'gx_validate_{table_name}',
+                conn_id=conn_id,
                 data_context_root_dir='/app/great_expectations',
-                data_asset_name=f'{table_name}',
-                dataframe_to_validate=data_to_validate,
-                execution_engine='PandasExecutionEngine',
+                schema=mssql_schema_name,
+                data_asset_name=table_name,
                 expectation_suite_name=f'{table_name}_suite',
                 return_json_dict=True,
                 dag=dag,
             )
+
+            # Task to validate the data from Pandas DataFrame
+            # validate_data_task = GreatExpectationsOperator(
+            #     task_id=f'gx_validate_{table_name}',
+            #     data_context_root_dir='/app/great_expectations',
+            #     data_asset_name=f'{table_name}',
+            #     dataframe_to_validate=data_to_validate,
+            #     execution_engine='PandasExecutionEngine',
+            #     expectation_suite_name=f'{table_name}_suite',
+            #     return_json_dict=True,
+            #     dag=dag,
+            # )
 
             # Task to load data into DuckDB
             load_task = PythonOperator(
