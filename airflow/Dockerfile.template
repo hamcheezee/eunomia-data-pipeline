@@ -9,14 +9,27 @@ USER root
 ENV AIRFLOW_UID=$AIRFLOW_UID
 RUN usermod -u $AIRFLOW_UID airflow
 
-# Update package lists
-RUN apt-get update
+# Update package lists and install necessary tools
+RUN apt update \
+    && apt install -y wget gnupg2 software-properties-common curl
+
+# Add Microsoft GPG key
+RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+
+# Add Microsoft repository
+RUN curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list
+
+# Update package list again
+RUN apt update
 
 # Install ODBC drivers
 RUN apt-get install -y --no-install-recommends \
     unixodbc \
     unixodbc-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Microsoft ODBC Driver 18 for SQL Server
+RUN ACCEPT_EULA=Y apt-get install -y msodbcsql18
 
 # Copy the Great Expectations folder into the container
 COPY gx /app/great_expectations
@@ -36,3 +49,12 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 # Launching DuckDB
 CMD ["duckdb", "/app/duckdb/duckdb.db"]
+
+# Install pyodbc
+RUN pip install pyodbc
+
+# Install Apache Airflow provider for Microsoft SQL Server
+RUN pip install apache-airflow-providers-microsoft-mssql==3.1.0
+
+# Enter Python environment and import necessary modules
+CMD python -c "from airflow.providers.microsoft.mssql.operators.mssql import MsSqlOperator; import sys; sys.exit()"
